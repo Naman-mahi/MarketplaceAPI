@@ -20,7 +20,7 @@ class ProductController
     {
         $connection = getDbConnection();
         $stmt = $connection->prepare("
-            SELECT p.product_id, p.dealer_id, p.category_id, p.product_name, p.product_description, p.price, p.color, p.top_features, p.stand_out_features, p.created_at, p.updated_at,
+            SELECT p.product_id, p.dealer_id, p.category_id, p.product_name, p.product_image, p.product_condition, p.brand_id, p.product_description, p.price, p.color, p.top_features, p.stand_out_features, p.created_at, p.updated_at,
                    pi.image_id, pi.image_url, pi.is_primary,
                    pa.pf_id, pa.category_id AS attribute_category_id, pa.pf_name,
                    pav.value,
@@ -50,6 +50,9 @@ class ProductController
                         'product_description' => $row['product_description'],
                         'price' => $row['price'],
                         'color' => $row['color'],
+                        'product_condition' => $row['product_condition'],
+                        'brand_id' => $row['brand_id'],
+                        'product_image' => $row['product_image'],
                         'top_features' => $row['top_features'],
                         'stand_out_features' => $row['stand_out_features'],
                         'created_at' => $row['created_at'] ?? null,
