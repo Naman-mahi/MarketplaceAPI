@@ -4,66 +4,107 @@ require_once(__DIR__ . '/../config/database.php');
 
 class AdvertisementsController
 {
-    public function createAdvertisement($title, $description, $image, $link, $startDate, $endDate)
+    private $connection;
+
+    public function __construct()
     {
-        $connection = getDbConnection();
-        $stmt = $connection->prepare("INSERT INTO advertisements (title, description, image, link, start_date, end_date) VALUES (?, ?, ?, ?, ?, ?)");
-        $stmt->bind_param("ssssss", $title, $description, $image, $link, $startDate, $endDate);
-        if ($stmt->execute()) {
-            return ['status' => 'success', 'message' => 'Advertisement created successfully.'];
-        }
-        return ['status' => 'error', 'message' => 'Advertisement creation failed.'];
+        $this->connection = getDbConnection();
     }
 
     public function getAdvertisements()
     {
-        $connection = getDbConnection();
-        $stmt = $connection->prepare("SELECT id, title, description, image, link, start_date, end_date FROM advertisements");
+        $stmt = $this->connection->prepare("SELECT id, title, description, image, link, start_datetime, end_datetime, created_at, updated_at FROM advertisements");
+        
+        if (!$stmt) {
+            return ['status' => 'error', 'message' => 'SQL prepare failed: ' . $this->connection->error];
+        }
+
         $stmt->execute();
         $result = $stmt->get_result();
         $advertisements = [];
+        
         while ($row = $result->fetch_assoc()) {
             $advertisements[] = $row;
         }
-        return ['status' => 'success', 'advertisements' => $advertisements];
+        
+        $stmt->close();
+        
+        return [
+            'status' => 'success',
+            'advertisements' => $advertisements
+        ];
     }
 
-    public function updateAdvertisement($id, $title, $description, $image, $link, $startDate, $endDate)
+    public function getAdvertisementById($advertisementId)
     {
-        $connection = getDbConnection();
-        $stmt = $connection->prepare("UPDATE advertisements SET title = ?, description = ?, image = ?, link = ?, start_date = ?, end_date = ? WHERE id = ?");
-        $stmt->bind_param("ssssssi", $title, $description, $image, $link, $startDate, $endDate, $id);
-        if ($stmt->execute()) {
-            return ['status' => 'success', 'message' => 'Advertisement updated successfully.'];
+        $stmt = $this->connection->prepare("SELECT id, title, description, image, link, start_datetime, end_datetime, created_at, updated_at FROM advertisements WHERE id = ?");
+        $stmt->bind_param("i", $advertisementId);
+        
+        if (!$stmt) {
+            return ['status' => 'error', 'message' => 'SQL prepare failed: ' . $this->connection->error];
         }
-        return ['status' => 'error', 'message' => 'Advertisement update failed.'];
+
+        $stmt->execute();
+        $result = $stmt->get_result();
+
+        if ($result->num_rows === 0) {
+            return ['status' => 'error', 'message' => 'Advertisement not found.'];
+        }
+
+        $advertisement = $result->fetch_assoc();
+        $stmt->close();
+        
+        return [
+            'status' => 'success',
+            'advertisement' => $advertisement
+        ];
     }
 
     public function deleteAdvertisement($id)
     {
-        $connection = getDbConnection();
-        $stmt = $connection->prepare("DELETE FROM advertisements WHERE id = ?");
+        $stmt = $this->connection->prepare("DELETE FROM advertisements WHERE id = ?");
         $stmt->bind_param("i", $id);
+        
+        if (!$stmt) {
+            return ['status' => 'error', 'message' => 'SQL prepare failed: ' . $this->connection->error];
+        }
+
         if ($stmt->execute()) {
+            $stmt->close();
             return ['status' => 'success', 'message' => 'Advertisement deleted successfully.'];
         }
+
+        $stmt->close();
         return ['status' => 'error', 'message' => 'Advertisement deletion failed.'];
     }
 
     public function getAdvertisementsForUser($userId)
     {
-        $connection = getDbConnection();
-        $stmt = $connection->prepare("SELECT id, title, description, image, link, start_date, end_date FROM advertisements WHERE user_id = ?");
+        $stmt = $this->connection->prepare("SELECT id, title, description, image, link, start_datetime, end_datetime, created_at, updated_at FROM advertisements WHERE user_id = ?");
         $stmt->bind_param("i", $userId);
+        
+        if (!$stmt) {
+            return ['status' => 'error', 'message' => 'SQL prepare failed: ' . $this->connection->error];
+        }
+
         $stmt->execute();
         $result = $stmt->get_result();
+        
         if ($result->num_rows === 0) {
+            $stmt->close();
             return ['status' => 'error', 'message' => 'No advertisements found for this user.'];
         }
+
         $advertisements = [];
         while ($row = $result->fetch_assoc()) {
             $advertisements[] = $row;
         }
-        return ['status' => 'success', 'advertisements' => $advertisements];
+
+        $stmt->close();
+        
+        return [
+            'status' => 'success',
+            'advertisements' => $advertisements
+        ];
     }
 }

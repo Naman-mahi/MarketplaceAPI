@@ -47,7 +47,7 @@ class UserController
         $connection = getDbConnection();
 
         // First, fetch user data
-        $stmt = $connection->prepare("SELECT * FROM users WHERE user_id = ?");
+        $stmt = $connection->prepare("SELECT user_id, email, role, first_name, last_name, mobile_number, profile_pic, user_status, created_at, referral_code, referred_by FROM users WHERE user_id = ?");
         $stmt->bind_param("i", $userId);
         $stmt->execute();
         $result = $stmt->get_result();
