@@ -7,6 +7,7 @@ include __DIR__ . '/controllers/ProductController.php';
 include __DIR__ . '/controllers/CouponController.php';
 include __DIR__ . '/controllers/RewardsController.php';
 include __DIR__ . '/controllers/AdvertisementsController.php';
+include __DIR__ . '/controllers/BannerController.php';
 
 // Instantiate controllers
 $userController = new UserController();
@@ -14,6 +15,7 @@ $productController = new ProductController();
 $couponController = new CouponController();
 $rewardsController = new RewardsController();
 $advertisementsController = new AdvertisementsController();
+$bannerController = new BannerController();
 
 // Set response headers
 header('Content-Type: application/json');
@@ -160,6 +162,11 @@ switch (true) {
 
     case $requestUri[0] === 'advertisementsbyid' && $requestMethod === 'GET' && isset($requestUri[1]):
         echo json_encode($advertisementsController->getAdvertisementById($requestUri[1]));
+        break;
+
+    // Banner routes
+    case $requestUri[0] === 'banners' && $requestMethod === 'GET':
+        echo json_encode($bannerController->getBanners());
         break;
 
     default:
