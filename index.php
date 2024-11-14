@@ -8,6 +8,58 @@ include __DIR__ . '/controllers/CouponController.php';
 include __DIR__ . '/controllers/RewardsController.php';
 include __DIR__ . '/controllers/AdvertisementsController.php';
 include __DIR__ . '/controllers/BannerController.php';
+include __DIR__ . '/controllers/CommanController.php';
+include __DIR__ . '/controllers/DealerController.php';
+
+// Function to retrieve the API key from request headers or query string
+function getApiKey()
+{
+    // Check for API key in Authorization header
+    $headers = apache_request_headers();
+    if (isset($headers['Authorization'])) {
+        // Extract the API key from 'Authorization: Bearer <key>'
+        preg_match('/Bearer (.*)/', $headers['Authorization'], $matches);
+        return $matches[1] ?? null;
+    }
+
+    // If API key is sent as a query parameter
+    if (isset($_GET['api_key'])) {
+        return $_GET['api_key'];
+    }
+
+    // If no API key found
+    return null;
+}
+
+// Function to validate the API key against the file
+function isValidApiKey($apiKey)
+{
+    // Path to the file where API keys are stored
+    $apiKeysFile = __DIR__ . '/config/api_keys.txt';
+
+    // Check if the file exists
+    if (!file_exists($apiKeysFile)) {
+        return false;
+    }
+
+    // Read the contents of the API keys file
+    $apiKeys = file($apiKeysFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+
+    // Check if the provided API key exists in the file
+    return in_array($apiKey, $apiKeys);
+}
+
+// Get the API key from the request
+$apiKey = getApiKey();
+
+// Validate the API key
+if ($apiKey === null || !isValidApiKey($apiKey)) {
+    // Invalid API key - respond with an error
+    header('HTTP/1.1 401 Unauthorized');
+    echo json_encode(['statuscode' => 401, 'status' => 'error', 'message' => 'Unauthorized: Invalid API key']);
+    exit();
+}
+
 
 // Instantiate controllers
 $userController = new UserController();
@@ -16,10 +68,25 @@ $couponController = new CouponController();
 $rewardsController = new RewardsController();
 $advertisementsController = new AdvertisementsController();
 $bannerController = new BannerController();
-
+$commanController = new CommanController();
+$dealerController = new DealerController();
 // Set response headers
+$allowedOrigins = [
+    'http://localhost',
+    'http://127.0.0.1',
+    'http://192.168.1.2',  // Local network IP or any other specific allowed domain
+    'http://example.com',  // Example of an external allowed domain
+    'http://another-domain.com'  // Another allowed domain
+];
 header('Content-Type: application/json');
-header("Access-Control-Allow-Origin: *");
+$origin = isset($_SERVER['HTTP_ORIGIN']) ? $_SERVER['HTTP_ORIGIN'] : '';
+
+if (in_array($origin, $allowedOrigins)) {
+    header("Access-Control-Allow-Origin: $origin");
+} else {
+    // If the origin is not in the allowed list, either set to '*' or deny access
+    header("Access-Control-Allow-Origin: *"); // You can use '*' to allow any origin if you want
+}
 header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization");
 
@@ -36,7 +103,41 @@ $requestUri = explode('/', trim(str_replace(parse_url(BASE_URL, PHP_URL_PATH), '
 // User routes
 switch (true) {
     case $requestUri[0] === 'register' && $requestMethod === 'POST':
-        $data = json_decode(file_get_contents('php://input'), true);
+        // $data = json_decode(file_get_contents('php://input'), true);
+        $data = $_POST;
+        // Validate required fields
+        $requiredFields = ['email', 'password', 'firstName', 'lastName', 'mobileNumber'];
+        foreach ($requiredFields as $field) {
+            if (!isset($data[$field]) || empty($data[$field])) {
+                echo json_encode([
+                    'statuscode' => 400,
+                    'status' => 'error',
+                    'message' => ucfirst($field) . ' is required'
+                ]);
+                break 2;
+            }
+        }
+
+        // Validate email format
+        if (!filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
+            echo json_encode([
+                'statuscode' => 400,
+                'status' => 'error',
+                'message' => 'Invalid email format'
+            ]);
+            break;
+        }
+
+        // Validate mobile number (assuming 10 digits)
+        if (!preg_match('/^[0-9]{10}$/', $data['mobileNumber'])) {
+            echo json_encode([
+                'statuscode' => 400,
+                'status' => 'error',
+                'message' => 'Invalid mobile number format'
+            ]);
+            break;
+        }
+
         echo json_encode($userController->register(
             $data['email'],
             $data['password'],
@@ -47,8 +148,17 @@ switch (true) {
         ));
         break;
 
+
     case $requestUri[0] === 'login' && $requestMethod === 'POST':
-        $data = json_decode(file_get_contents('php://input'), true);
+        $data = $_POST;
+        if (!isset($data['email']) || !isset($data['password'])) {
+            echo json_encode([
+                'statuscode' => 400,
+                'status' => 'error',
+                'message' => 'Email and password are required'
+            ]);
+            break;
+        }
         echo json_encode($userController->login($data['email'], $data['password']));
         break;
 
@@ -71,35 +181,43 @@ switch (true) {
         echo json_encode($userController->resetPassword($data['email'], $data['password']));
         break;
 
-    case $requestUri[0] === 'fetch-otp' && $requestMethod === 'POST':
-        $data = json_decode(file_get_contents('php://input'), true);
-        echo json_encode($userController->fetchOtp($data['email']));
-        break;
-
     case $requestUri[0] === 'verify-otp' && $requestMethod === 'POST':
-        $data = json_decode(file_get_contents('php://input'), true);
+        $data = $_POST;
         echo json_encode($userController->verifyOtp($data['email'], $data['otp']));
         break;
 
-    // Product routes
+        // Product routes
     case $requestUri[0] === 'products' && $requestMethod === 'GET':
         echo json_encode($productController->getProducts());
+        break;
+    case $requestUri[0] === 'newcars' && $requestMethod === 'GET':
+        echo json_encode($productController->getProductsCars());
+        break;
+    case $requestUri[0] === 'spareparts' && $requestMethod === 'GET':
+        echo json_encode($productController->getProductsSpareparts());
+        break;
+    case $requestUri[0] === 'oldcars' && $requestMethod === 'GET':
+        echo json_encode($productController->getProductsOldCars());
         break;
 
     case $requestUri[0] === 'product' && $requestMethod === 'GET' && isset($requestUri[1]):
         echo json_encode($productController->getProductById($requestUri[1]));
         break;
 
-    case $requestUri[0] === 'products' && $requestMethod === 'POST':
-        $data = json_decode(file_get_contents('php://input'), true);
-        echo json_encode($productController->createProduct($data['name'], $data['price']));
+
+    case $requestUri[0] === 'featured-products' && $requestMethod === 'GET':
+        echo json_encode($productController->getFeaturedProducts());
         break;
 
     case $requestUri[0] === 'brands' && $requestMethod === 'GET':
-        echo json_encode($productController->getBrands());
+        echo json_encode($commanController->getBrands());
         break;
 
-    // Coupon routes
+    case $requestUri[0] === 'city' && $requestMethod === 'GET':
+        echo json_encode($commanController->getCities());
+        break;
+
+        // Coupon routes
     case $requestUri[0] === 'coupons' && $requestMethod === 'POST':
         $data = json_decode(file_get_contents('php://input'), true);
         echo json_encode($couponController->createCoupon($data['code'], $data['discount'], $data['expiration']));
@@ -127,7 +245,7 @@ switch (true) {
         echo json_encode($productController->getProductsByDealerId($requestUri[1]));
         break;
 
-    // Rewards routes
+        // Rewards routes
     case $requestUri[0] === 'rewards' && $requestMethod === 'POST':
         $data = json_decode(file_get_contents('php://input'), true);
         echo json_encode($rewardsController->createReward($data['referrerId'], $data['referredId'], $data['rewardAmount']));
@@ -150,7 +268,7 @@ switch (true) {
         echo json_encode($rewardsController->getRewardsForUser($requestUri[1]));
         break;
 
-    // Advertisements routes
+        // Advertisements routes
     case $requestUri[0] === 'advertisements' && $requestMethod === 'GET':
         try {
             echo json_encode($advertisementsController->getAdvertisements());
@@ -164,11 +282,39 @@ switch (true) {
         echo json_encode($advertisementsController->getAdvertisementById($requestUri[1]));
         break;
 
-    // Banner routes
+        // Banner routes
     case $requestUri[0] === 'banners' && $requestMethod === 'GET':
         echo json_encode($bannerController->getBanners());
         break;
 
+        // Dealer routes
+    case $requestUri[0] === 'dealer-products' && $requestMethod === 'GET':
+        echo json_encode($dealerController->fetchProductsForDealer());
+        break;
+    case $requestUri[0] === 'dealer-products-by-category' && $requestMethod === 'GET' && isset($requestUri[1]):
+        echo json_encode($dealerController->fetchProductsByCategory($requestUri[1]));
+        break;
+    case $requestUri[0] === 'dealer-product-by-id' && $requestMethod === 'GET' && isset($requestUri[1]):
+        echo json_encode($dealerController->fetchProductById($requestUri[1]));
+        break;
+    case $requestUri[0] === 'dealer-connect' && $requestMethod === 'GET':
+        echo json_encode($dealerController->fetchAllProducts());
+        break;
+    case $requestUri[0] === 'cities-with-dealer-count' && $requestMethod === 'GET':
+        echo json_encode($commanController->getCitiesWithDealerCount());
+        break;
+    case $requestUri[0] === 'cars-by-make' && $requestMethod === 'GET' && isset($requestUri[1]):
+        echo json_encode($commanController->getCarByMake($requestUri[1]));
+        break;
+    case $requestUri[0] === 'inspected-cars' && $requestMethod === 'GET' && isset($requestUri[1]):
+        echo json_encode($commanController->getInspectedCars($requestUri[1]));
+        break;
+    case $requestUri[0] === 'inspected-report' && $requestMethod === 'GET' && isset($requestUri[1]):
+        echo json_encode($commanController->getInspectedReport($requestUri[1]));
+        break;
+    case $requestUri[0] === 'inspected-report-points' && $requestMethod === 'GET' && isset($requestUri[1]):
+        echo json_encode($commanController->getInspectedReportPoints($requestUri[1]));
+        break;
     default:
         http_response_code(404);
         echo json_encode(['status' => 'error', 'message' => 'API endpoint not found']);

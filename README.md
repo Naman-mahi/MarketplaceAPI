@@ -1,7 +1,7 @@
 # Marketplace-API
 
 ## Description
-This project is a RESTful API for a marketplace application. It provides endpoints for managing products, users, rewards, referrals, coupons, and advertisements.
+This project is a RESTful API for a marketplace application. It provides endpoints for managing products, users, rewards, referrals, coupons, advertisements, banners and dealer products.
 
 ## Features
 - User authentication and authorization
@@ -9,6 +9,8 @@ This project is a RESTful API for a marketplace application. It provides endpoin
 - Coupon system
 - Rewards and referral program
 - Advertisement management
+- Banner management
+- Dealer product management
 - Search and filtering capabilities
 
 ## Technologies Used
@@ -17,10 +19,9 @@ This project is a RESTful API for a marketplace application. It provides endpoin
 - RESTful API architecture
 - JSON for data exchange
 
-
 ## API Endpoints
-BASE URL: http://localhost/marketplace-api/
-live version: https://marketplace-api-production.up.railway.app/
+BASE URL: http://localhost/KENZAPI/
+live version: https://api.intencode.com/
 
 ### User Routes
 - `POST BASE_URL/register`: Register a new user
@@ -35,9 +36,18 @@ live version: https://marketplace-api-production.up.railway.app/
 ### Product Routes
 - `GET BASE_URL/products`: Get all products
 - `GET BASE_URL/product/{id}`: Get product by ID
-- `POST BASE_URL/products`: Create a new product
+- `GET BASE_URL/newcars`: Get new cars
+- `GET BASE_URL/spareparts`: Get spare parts
+- `GET BASE_URL/oldcars`: Get old cars
+- `GET BASE_URL/featured-products`: Get featured products
 - `GET BASE_URL/brands`: Get all brands
-- `GET BASE_URL/dealer-products/{id}`: Get products by dealer ID
+- `GET BASE_URL/city`: Get all cities
+
+### Dealer Routes
+- `GET BASE_URL/dealer-products`: Get dealer's products
+- `GET BASE_URL/dealer-products-by-category/{id}`: Get dealer's products by category
+- `GET BASE_URL/dealer-product-by-id/{id}`: Get dealer's product by ID
+- `GET BASE_URL/dealer-connect`: Get all products for dealer marketplace
 
 ### Coupon Routes
 - `POST BASE_URL/coupons`: Create a new coupon
@@ -54,14 +64,8 @@ live version: https://marketplace-api-production.up.railway.app/
 - `GET BASE_URL/rewards/{id}`: Get rewards for a specific user
 
 ### Advertisement Routes
-- `POST BASE_URL/advertisements`: Create a new advertisement
 - `GET BASE_URL/advertisements`: Get all advertisements
-- `PUT BASE_URL/advertisements/{id}`: Update an advertisement
-- `DELETE BASE_URL/advertisements/{id}`: Delete an advertisement
-- `GET BASE_URL/advertisements/{id}`: Get advertisements for a specific user
+- `GET BASE_URL/advertisementsbyid/{id}`: Get advertisement by ID
 
-
-
-
-
-
+### Banner Routes
+- `GET BASE_URL/banners`: Get all banners

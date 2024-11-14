@@ -5,4 +5,4 @@ define('DB_USER', 'root');
 define('DB_PASS', '');
 define('DB_NAME', 'marketplace');
 
-define('BASE_URL', 'http://localhost/MarketplaceAPI');
+define('BASE_URL', 'http://localhost/kenzapi/');
