@@ -172,13 +172,13 @@ switch (true) {
         break;
 
     case $requestUri[0] === 'forgot-password' && $requestMethod === 'POST':
-        $data = json_decode(file_get_contents('php://input'), true);
+        $data = $_POST;
         echo json_encode($userController->forgotPassword($data['email']));
         break;
 
     case $requestUri[0] === 'reset-password' && $requestMethod === 'POST':
-        $data = json_decode(file_get_contents('php://input'), true);
-        echo json_encode($userController->resetPassword($data['email'], $data['password']));
+        $data = $_POST;
+        echo json_encode($userController->resetPassword($data['password'], $data['token']));
         break;
 
     case $requestUri[0] === 'verify-otp' && $requestMethod === 'POST':
@@ -196,7 +196,8 @@ switch (true) {
     case $requestUri[0] === 'spareparts' && $requestMethod === 'GET':
         echo json_encode($productController->getProductsSpareparts());
         break;
-    case $requestUri[0] === 'oldcars' && $requestMethod === 'GET':
+
+    case $requestUri[0] == 'oldcars' && $requestMethod == 'GET':
         echo json_encode($productController->getProductsOldCars());
         break;
 
@@ -297,7 +298,7 @@ switch (true) {
     case $requestUri[0] === 'dealer-product-by-id' && $requestMethod === 'GET' && isset($requestUri[1]):
         echo json_encode($dealerController->fetchProductById($requestUri[1]));
         break;
-    case $requestUri[0] === 'dealer-connect' && $requestMethod === 'GET':
+    case $requestUri[0] === 'dealer-connect1' && $requestMethod === 'GET':
         echo json_encode($dealerController->fetchAllProducts());
         break;
     case $requestUri[0] === 'cities-with-dealer-count' && $requestMethod === 'GET':
@@ -314,6 +315,12 @@ switch (true) {
         break;
     case $requestUri[0] === 'inspected-report-points' && $requestMethod === 'GET' && isset($requestUri[1]):
         echo json_encode($commanController->getInspectedReportPoints($requestUri[1]));
+        break;
+    case $requestUri[0] === 'statistics' && $requestMethod === 'GET' && isset($requestUri[1]):
+        echo json_encode($dealerController->statistics($requestUri[1]));
+        break;
+    case $requestUri[0] === 'dealer-connect' && $requestMethod === 'GET':
+        echo json_encode($dealerController->Dealerconnect());
         break;
     default:
         http_response_code(404);

@@ -288,22 +288,87 @@ class ProductController
     public function getProductsOldCars()
     {
         $connection = getDbConnection();
-        $stmt = $connection->prepare("
+        // Capture GET parameters, with defaults if not set
+        $make = isset($_GET['make']) ? $_GET['make'] : null;
+        $model = isset($_GET['model']) ? $_GET['model'] : null;
+        $price = isset($_GET['price']) ? $_GET['price'] : null;
+        $city = isset($_GET['city']) ? $_GET['city'] : null;
+        $category_id = 19;  // Assuming the category_id is always 19 for old cars, as per your original query
+        
+        // Start building the SQL query
+        $sql = "
             SELECT p.product_id, p.dealer_id, p.category_id, p.product_name, p.product_image, p.product_condition, p.is_featured, p.product_features, p.brand_id, p.product_description, p.price, p.color, p.top_features, p.stand_out_features, p.created_at, p.updated_at,
                    pi.image_id, pi.image_url, pi.is_primary,
                    pa.pf_id, pa.category_id AS attribute_category_id, pa.pf_name,
                    pav.value,
                    pca.custom_attribute_id, pca.attribute_name, pca.attribute_value,
-                   pub.marketplace, pub.website, pub.own_website
+                   pub.marketplace, pub.website, pub.own_website,
+                   d.city
             FROM products p
             LEFT JOIN product_images pi ON p.product_id = pi.product_id
             LEFT JOIN product_attributes pa ON p.category_id = pa.category_id
             LEFT JOIN product_attributes_value pav ON pa.pf_id = pav.attribute_id AND p.product_id = pav.product_id
             LEFT JOIN product_custom_attributes pca ON p.product_id = pca.product_id
             LEFT JOIN product_publish pub ON p.product_id = pub.product_id
-            WHERE p.category_id = 19
-            ");
-        $stmt->execute();
+            LEFT JOIN dealers d ON p.dealer_id = d.dealer_id
+            WHERE p.category_id = ?
+        ";
+        
+        // Array to hold the parameters
+        $params = [$category_id];
+        
+        // Modify the query based on the provided parameters
+        if ($make) {
+            $sql .= " AND p.brand_id = ?";
+            $params[] = $make;  // assuming make refers to brand_id
+        }
+        
+        if ($model) {
+            $sql .= " AND p.product_name LIKE ?";
+            $params[] = '%' . $model . '%';  // Assuming model is part of the product name
+        }
+        
+        if ($price) {
+            $sql .= " AND p.price <= ?";
+            $params[] = $price;  // assuming price is an upper limit
+        }
+        
+        if ($city) {
+            $sql .= " AND d.city = ?";
+            $params[] = $city;
+        }
+        
+        // Adding filters for product attributes based on GET parameters
+        $filters = [
+            'mileage' => 'Mileage (MPG)',
+            'engine_power' => 'Engine Power (HP)',
+            'num_doors' => 'Number of Doors',
+            'fuel_type' => 'Fuel Type',
+            'transmission' => 'Transmission Type',
+            'tire_size' => 'Tire Size',
+            'warranty_period' => 'Warranty Period (years)',
+            'safety_rating' => 'Safety Rating',
+            'model_attr' => 'Model',
+            'engine_type' => 'Engine Type'
+        ];
+        
+        // Loop through the filter options
+        foreach ($filters as $param_name => $pf_name) {
+            if (isset($_GET[$param_name])) {
+                $sql .= " AND pa.pf_name = ? AND pav.value = ?";
+                $params[] = $pf_name;  // Filtering based on the attribute name
+                $params[] = $_GET[$param_name];  // Filtering based on the selected attribute value
+            }
+        }
+        
+        // Prepare the statement
+        $stmt = $connection->prepare($sql);
+        
+        // Bind the parameters dynamically
+        $stmt->bind_param(str_repeat('s', count($params)), ...$params);
+        
+        // Execute the query
+        $stmt->execute();        
 
         $rows = $stmt->get_result();
         error_log(print_r($rows, true)); // Log the rows for inspection
