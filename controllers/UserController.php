@@ -401,4 +401,57 @@ class UserController
 
         return ['statuscode' => 401, 'status' => 'error', 'message' => 'Invalid OTP'];
     }
+
+    public function getReferralCode($userId)
+    {
+        $connection = getDbConnection();
+        $stmt = $connection->prepare("SELECT referral_code FROM users WHERE user_id = ?");
+        $stmt->bind_param("i", $userId); // Bind the user_id parameter to the query
+        $stmt->execute();
+        $result = $stmt->get_result();
+    
+        if ($result->num_rows > 0) {
+            return [
+                'status' => 'success',
+                'message' => 'Referral code found successfully',
+                'data' => $result->fetch_all(MYSQLI_ASSOC)
+            ];
+        }
+        return [
+            'status' => 'error',
+            'message' => 'No referral code found for this user',
+            'data' => []
+        ];
+    }
+
+    public function getReferralRewards($userId)
+    {
+        $connection = getDbConnection();
+        $stmt = $connection->prepare(
+            "SELECT rr.id, rr.referrer_id, rr.referred_id, rr.reward_amount, rr.created_at, 
+                    u.first_name, u.last_name, u.email
+             FROM referral_rewards rr
+             LEFT JOIN users u ON rr.referrer_id = u.user_id
+             WHERE rr.referrer_id = ?"
+        );
+        $stmt->bind_param("i", $userId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+    
+        if ($result->num_rows > 0) {
+            return [
+                'status' => 'success',
+                'message' => 'Referral rewards found successfully',
+                'data' => $result->fetch_all(MYSQLI_ASSOC)
+            ];
+        }
+        return [
+            'status' => 'error',
+            'message' => 'No referral rewards found',
+            'data' => []
+        ];
+    }
+    
+
+    
 }

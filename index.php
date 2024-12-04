@@ -166,6 +166,14 @@ switch (true) {
         echo json_encode($userController->getUserProfile($requestUri[1]));
         break;
 
+    case $requestUri[0] === 'referral-code' && $requestMethod === 'GET' && isset($requestUri[1]):
+        echo json_encode($userController->getReferralCode($requestUri[1]));
+        break;
+
+    case $requestUri[0] === 'referral-rewards' && $requestMethod === 'GET' && isset($requestUri[1]):
+        echo json_encode($userController->getReferralRewards($requestUri[1]));
+        break;
+
     case $requestUri[0] === 'update-profile' && $requestMethod === 'POST' && isset($requestUri[1]):
         $data = json_decode(file_get_contents('php://input'), true);
         echo json_encode($userController->updateUserProfile($requestUri[1], $data['firstName'], $data['lastName'], $data['mobileNumber'], $data['profilePic']));
@@ -242,10 +250,6 @@ switch (true) {
         echo json_encode($couponController->deleteCoupon($requestUri[1]));
         break;
 
-    case $requestUri[0] === 'dealer-products' && $requestMethod === 'GET' && isset($requestUri[1]):
-        echo json_encode($productController->getProductsByDealerId($requestUri[1]));
-        break;
-
         // Rewards routes
     case $requestUri[0] === 'rewards' && $requestMethod === 'POST':
         $data = json_decode(file_get_contents('php://input'), true);
@@ -289,8 +293,17 @@ switch (true) {
         break;
 
         // Dealer routes
-    case $requestUri[0] === 'dealer-products' && $requestMethod === 'GET':
-        echo json_encode($dealerController->fetchProductsForDealer());
+    case $requestUri[0] === 'dealer-products' && $requestMethod === 'GET' && isset($requestUri[1]):
+        echo json_encode($dealerController->fetchProductsForDealer($requestUri[1]));
+        break;
+    case $requestUri[0] === 'dealer-oldcars' && $requestMethod === 'GET' && isset($requestUri[1]):
+        echo json_encode($dealerController->fetchProductsForDealerOldCars($requestUri[1]));
+        break;
+    case $requestUri[0] === 'dealer-newcars' && $requestMethod === 'GET' && isset($requestUri[1]):
+        echo json_encode($dealerController->fetchProductsForDealerNewCars($requestUri[1]));
+        break;
+    case $requestUri[0] === 'dealer-spareparts' && $requestMethod === 'GET' && isset($requestUri[1]):
+        echo json_encode($dealerController->fetchProductsForDealerSpareParts($requestUri[1]));
         break;
     case $requestUri[0] === 'dealer-products-by-category' && $requestMethod === 'GET' && isset($requestUri[1]):
         echo json_encode($dealerController->fetchProductsByCategory($requestUri[1]));
@@ -321,6 +334,15 @@ switch (true) {
         break;
     case $requestUri[0] === 'dealer-connect' && $requestMethod === 'GET':
         echo json_encode($dealerController->Dealerconnect());
+        break;
+    case $requestUri[0] === 'dealer-wallet-amount' && $requestMethod === 'GET' && isset($requestUri[1]):
+        echo json_encode($dealerController->getAmount($requestUri[1]));
+        break;
+    case $requestUri[0] === 'expired-advertisements' && $requestMethod === 'GET' && isset($requestUri[1]):
+        echo json_encode($dealerController->getExpiredAdvertisements($requestUri[1]));
+        break;
+    case $requestUri[0] === 'running-and-upcoming-advertisements' && $requestMethod === 'GET' && isset($requestUri[1]):
+        echo json_encode($dealerController->getRunningAndUpcomingAdvertisements($requestUri[1]));
         break;
     default:
         http_response_code(404);
