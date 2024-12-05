@@ -581,27 +581,70 @@ class DealerController
     //dealer products
     public function Dealerconnect()
     {
+        // Step 1: Get the database connection
         $connection = getDbConnection();
+        
+        // Step 2: Define the marketplace variable
         $marketplace = 1;
-        $stmt = $connection->prepare("SELECT * FROM products 
-        join product_publish on products.product_id = product_publish.product_id 
-        WHERE product_publish.marketplace = ?");
+        
+        // Step 3: Prepare the SQL query
+        $stmt = $connection->prepare("SELECT *
+                                      FROM products 
+                                      JOIN product_publish ON products.product_id = product_publish.product_id 
+                                      LEFT JOIN brands ON products.brand_id = brands.brand_id
+                                      WHERE product_publish.marketplace = ?");
+        
+        // Step 4: Bind the parameter and execute the statement
         $stmt->bind_param("i", $marketplace);
         $stmt->execute();
+        
+        // Step 5: Get the result
         $result = $stmt->get_result();
+        
+        // Step 6: Check if products are found
         if ($result->num_rows > 0) {
+            $products = [];
+            
+            // Step 7: Fetch each row and format the response as needed
+            while ($row = $result->fetch_assoc()) {
+                $products[] = [
+                    'product_id' => $row['product_id'],
+                    'dealer_id' => $row['dealer_id'],
+                    'category_id' => $row['category_id'],
+                    'product_name' => $row['product_name'],
+                    'product_description' => $row['product_description'],
+                    'price' => $row['price'],
+                    'color' => $row['color'],
+                    'product_condition' => $row['product_condition'],
+                    'brand_id' => $row['brand_id'],
+                    'brand_name' => $row['brand_name'],
+                    'product_image' => THUMBNAIL_URL . $row['product_image'],
+                    'is_featured' => $row['is_featured'],
+                    'product_features' => $row['product_features'],
+                    'top_features' => $row['top_features'],
+                    'stand_out_features' => $row['stand_out_features'],
+                    'created_at' => $row['created_at'] ?? null,
+                    'updated_at' => $row['updated_at'] ?? null,
+                    'brand_name' => $row['brand_name']
+                ];
+            }
+            
+            // Step 8: Return the formatted data
             return [
                 'status' => 'success',
                 'message' => 'Products found successfully',
-                'data' => $result->fetch_all(MYSQLI_ASSOC)
+                'data' => $products
             ];
         }
+        
+        // Step 9: Return an error message if no products found
         return [
             'status' => 'error',
             'message' => 'No products found',
             'data' => []
         ];
     }
+    
 
     public function getAmount($userId)
     {
@@ -629,58 +672,87 @@ class DealerController
     {
         $connection = getDbConnection();
         $currentDate = date('Y-m-d H:i:s'); // Get the current datetime
+    
+        // Prepare the SQL query to get expired advertisements
         $stmt = $connection->prepare(
             "SELECT id, title, description, image, link, start_datetime, end_datetime, created_by, created_at, updated_at 
-         FROM advertisements 
-         WHERE end_datetime < ? AND created_by = ?"
+             FROM advertisements 
+             WHERE end_datetime < ? AND created_by = ?"
         );
-        $stmt->bind_param("si", $currentDate, $userId); // Bind the current datetime to the query
+    
+        // Bind the current datetime for the condition and the user_id for created_by
+        $stmt->bind_param("si", $currentDate, $userId);
         $stmt->execute();
         $result = $stmt->get_result();
-
+    
         if ($result->num_rows > 0) {
+            $advertisements = [];
+            // Loop through the result and modify each row
+            while ($row = $result->fetch_assoc()) {
+                // Prepare the image URL
+                $row['image'] = ADVERTISEMENT_URL . $row['image'];
+                // Add the advertisement to the result array
+                $advertisements[] = $row;
+            }
+    
             return [
                 'status' => 'success',
                 'message' => 'Expired advertisements found successfully',
-                'data' => $result->fetch_all(MYSQLI_ASSOC)
+                'data' => $advertisements
             ];
         }
+    
         return [
             'status' => 'error',
             'message' => 'No expired advertisements found',
             'data' => []
         ];
     }
+    
 
     public function getRunningAndUpcomingAdvertisements($userId)
     {
         $connection = getDbConnection();
         $currentDate = date('Y-m-d H:i:s'); // Get the current datetime
+    
+        // Prepare the SQL query to get running and upcoming advertisements
         $stmt = $connection->prepare(
             "SELECT id, title, description, image, link, start_datetime, end_datetime, created_by, created_at, updated_at
-         FROM advertisements 
-         WHERE (start_datetime <= ? AND end_datetime >= ?) 
-            OR start_datetime > ? 
-         AND created_by = ?"
+             FROM advertisements 
+             WHERE (start_datetime <= ? AND end_datetime >= ?) 
+                OR start_datetime > ? 
+             AND created_by = ?"
         );
+    
         // Bind the current datetime for conditions and the user_id for created_by
         $stmt->bind_param("ssss", $currentDate, $currentDate, $currentDate, $userId);
         $stmt->execute();
         $result = $stmt->get_result();
-
+    
         if ($result->num_rows > 0) {
+            $advertisements = [];
+            // Loop through the result and build the advertisements array
+            while ($row = $result->fetch_assoc()) {
+                // Prepare the image URL
+                $row['image'] = ADVERTISEMENT_URL . $row['image'];
+                // Add the advertisement to the result array
+                $advertisements[] = $row;
+            }
+    
             return [
                 'status' => 'success',
                 'message' => 'Running and upcoming advertisements found successfully',
-                'data' => $result->fetch_all(MYSQLI_ASSOC)
+                'data' => $advertisements
             ];
         }
+    
         return [
             'status' => 'error',
             'message' => 'No running or upcoming advertisements found for this user',
             'data' => []
         ];
     }
+    
 }
 
 
