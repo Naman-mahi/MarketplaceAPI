@@ -10,3 +10,4 @@ define('THUMBNAIL_URL', 'https://kenzwheels.com/marketplace/Manage/uploads/Produ
 define('IMAGES_URL', 'https://kenzwheels.com/marketplace/Manage/uploads/ProductImages/');
 define('BANNER_URL', 'https://kenzwheels.com/marketplace/Manage/uploads/Banners/');
 define('ADVERTISEMENT_URL', 'https://kenzwheels.com/marketplace/Manage/uploads/Advertisements/');
+define('BRAND_URL', 'https://kenzwheels.com/marketplace/Manage/uploads/BrandLogo/');

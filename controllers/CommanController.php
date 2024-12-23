@@ -9,10 +9,22 @@ class CommanController
     public function getBrands()
     {
         $connection = getDbConnection();
-        $stmt = $connection->prepare("SELECT * FROM brands");
+        $stmt = $connection->prepare("SELECT brand_id, brand_name, brand_logo, category_id, created_date FROM brands WHERE 1");
         $stmt->execute();
         $result = $stmt->get_result();
-        return ['status' => 200, 'message' => 'Brands fetched successfully', 'data' => $result->fetch_all(MYSQLI_ASSOC)];
+        $brands = [];
+        
+        while ($row = $result->fetch_assoc()) {
+            // Add full URL to brand logo
+            $row['brand_logo'] = !empty($row['brand_logo']) ? BRAND_URL . $row['brand_logo'] : null;
+            $brands[] = $row;
+        }
+
+        return [
+            'status' => 200,
+            'message' => 'Brands fetched successfully',
+            'data' => $brands
+        ];
     }
 
     // list of cities from dealers table
@@ -178,8 +190,164 @@ class CommanController
         $stmt->bind_param('i', $product_id);
         $stmt->execute();
         $result = $stmt->get_result();
-        return ['status' => 200, 'message' => 'Inspected report fetched successfully', 'data' => $result->fetch_all(MYSQLI_ASSOC)];
+    
+        // Fetch the result as an associative array
+        $data = $result->fetch_assoc();
+    
+        // Define valid values for each field (you can extend this list)
+        $valid_values = [
+            'engine_oil_level' => ['Ok', 'Low', 'Black'],
+            'engine_oil_leakage' => ['No Leakage', 'Leakage'],
+            'transmission_oil_leakage' => ['No Leakage', 'Leakage'],
+            'transfer_case_oil_leakage' => ['No Leakage', 'Leakage'],
+            'coolant_leakage' => ['No Leakage', 'Leakage'],
+            'brake_oil_leakage' => ['No Leakage', 'Leakage'],
+            'power_steering_oil_leakage' => ['No Leakage', 'Leakage'],
+            'differential_oil_leakage' => ['No Leakage', 'Leakage'],
+            'fan_belt_condition' => ['Ok', 'Worn Out', 'Broken'],
+            'engine_noise' => ['No Noise', 'Clunking', 'Rattling'],
+            'engine_vibration' => ['No Vibration', 'Vibrating'],
+            'exhaust_sound' => ['Ok', 'Loud', 'Clogged'],
+            'radiator_condition' => ['Ok', 'Leaking', 'Damaged'],
+            'transmission_electronics' => ['Ok', 'Faulty'],
+            'front_right_disc_condition' => ['Ok', 'Damaged', 'Worn Out'],
+            'front_left_disc_condition' => ['Ok', 'Damaged', 'Worn Out'],
+            'front_right_brake_pad_condition' => ['Ok', 'Worn Out'],
+            'front_left_brake_pad_condition' => ['Ok', 'Worn Out'],
+            'steering_wheel_play' => ['Ok', 'Loose'],
+            'ball_joints_condition' => ['Ok', 'Worn Out'],
+            'z_links_condition' => ['Ok', 'Damaged'],
+            'tie_rod_ends_condition' => ['Ok', 'Worn Out'],
+            'shock_absorbers_condition' => ['Ok', 'Leaking'],
+            'rear_suspension_bushes_condition' => ['No Damage Found', 'Damaged'],
+            'rear_shocks_condition' => ['Ok', 'Leaking'],
+            'steering_wheel_condition' => ['Ok', 'Loose'],
+            'seats_electric_function' => ['Working', 'Not Working'],
+            'seat_belts_condition' => ['Working', 'Worn Out'],
+            'windows_condition' => ['Working Properly', 'Not Working'],
+            'dash_controls_condition' => ['Working', 'Not Working'],
+            'audio_video_condition' => ['Working', 'Not Working'],
+            'rear_view_camera_condition' => ['Working', 'Not Working'],
+            'trunk_bonnet_release_condition' => ['Working', 'Not Working'],
+            'sun_roof_control_condition' => ['Working', 'Not Working'],
+            'ac_operational' => ['Yes', 'No'],
+            'blower_air_throw_condition' => ['Excellent', 'Good', 'Weak'],
+            'cooling_condition' => ['Excellent', 'Good', 'Weak'],
+            'heating_condition' => ['Excellent', 'Good', 'Weak'],
+            'warning_lights_condition' => ['ABS Warning Light Present', 'No Warning Lights'],
+            'battery_condition' => ['12V, Terminals Condition Ok', 'Faulty'],
+            'instrument_cluster_condition' => ['Gauges Working', 'Not Working'],
+            'trunk_lock_condition' => ['Ok', 'Faulty'],
+            'windshield_condition' => ['Chip', 'Cracked', 'Ok'],
+            'window_condition' => ['Ok', 'Cracked'],
+            'headlights_condition' => ['Working', 'Not Working'],
+            'taillights_condition' => ['Working', 'Not Working'],
+            'fog_lights_condition' => ['Working', 'Not Working'],
+            'tyre_brand' => ['Michelin', 'Bridgestone', 'Goodyear'],
+            'tyre_tread' => ['7.0mm', '6.0mm', '5.0mm'],
+            'tyre_size' => ['275/50/R21', '225/60/R16'],
+            'rims_condition' => ['Alloy', 'Steel'],
+            'engine_pick_feedback' => ['Ok', 'Weak', 'Powerful'],
+            'gear_shifting_feedback' => ['Smooth', 'Stiff', 'Laggy'],
+            'brake_pedal_operation_feedback' => ['Timely Response', 'Delayed Response', 'Hard Pedal'],
+            'abs_operation_feedback' => ['Timely Response', 'Delayed Response', 'No ABS'],
+            'suspension_noise_feedback' => ['No Noise', 'Clunking Noise', 'Squeaking Noise'],
+            'steering_operation_feedback' => ['Smooth', 'Heavy', 'Loose'],
+            'ac_heater_feedback' => ['Perfect', 'Weak', 'Not Working']
+        ];
+    
+        // Initialize counters for total and filled fields
+        $total_fields = count($valid_values);
+        $filled_fields = 0;
+    
+        // Loop through each field and check if the value matches one of the valid values
+        foreach ($valid_values as $field => $valid_opts) {
+            if (in_array($data[$field], $valid_opts)) {
+                $filled_fields++;
+            }
+        }
+    
+        // Calculate the percentage of completion
+        $completion_percentage = ($filled_fields / $total_fields) * 100;
+        $category_percentages = [
+            'ENGINE / TRANSMISSION / CLUTCH' => 0,
+            'BRAKES' => 0,
+            'SUSPENSION/STEERING' => 0,
+            'INTERIOR' => 0,
+            'AC/HEATER' => 0,
+            'ELECTRICAL & ELECTRONICS' => 0,
+            'EXTERIOR & BODY' => 0,
+            'TYRES' => 0
+        ];
+    
+        // ENGINE / TRANSMISSION / CLUTCH (Engine oil, transmission oil, clutch feedback)
+        if ($data['engine_oil_level'] == 'Ok' && $data['transmission_oil_leakage'] == 'No Leakage') {
+            $category_percentages['ENGINE / TRANSMISSION / CLUTCH'] = 95;
+        }
+    
+        // BRAKES (Brake oil, disc condition, brake pads)
+        if ($data['front_right_disc_condition'] == 'Damaged' || $data['front_left_disc_condition'] == 'Damaged') {
+            $category_percentages['BRAKES'] = 75; // Adjust based on conditions
+        } else {
+            $category_percentages['BRAKES'] = 100;
+        }
+    
+        // SUSPENSION/STEERING (Suspension noise, steering operation)
+        if ($data['suspension_noise_feedback'] == 'No Noise' && $data['steering_operation_feedback'] == 'Smooth') {
+            $category_percentages['SUSPENSION/STEERING'] = 99;
+        } else {
+            $category_percentages['SUSPENSION/STEERING'] = 80; // Adjust based on feedback
+        }
+    
+        // INTERIOR (Seats, seat belts, windows, dashboard)
+        if ($data['seats_electric_function'] == 'Working (Right & Left Front)' && $data['windows_condition'] == 'Working Properly (All 4 Windows)') {
+            $category_percentages['INTERIOR'] = 75;
+        }
+    
+        // AC/HEATER (AC and heater condition)
+        if ($data['ac_operational'] == 'Yes' && $data['blower_air_throw_condition'] == 'Excellent') {
+            $category_percentages['AC/HEATER'] = 84;
+        }
+    
+        // ELECTRICAL & ELECTRONICS (Lights, audio, battery, instruments)
+        if ($data['warning_lights_condition'] == 'ABS Warning Light Present') {
+            $category_percentages['ELECTRICAL & ELECTRONICS'] = 85; // Adjust if warning light is present
+        } else {
+            $category_percentages['ELECTRICAL & ELECTRONICS'] = 99;
+        }
+    
+        // EXTERIOR & BODY (Body condition, windows, headlights, taillights)
+        if ($data['windshield_condition'] == 'Chip (Front)') {
+            $category_percentages['EXTERIOR & BODY'] = 33;
+        } else {
+            $category_percentages['EXTERIOR & BODY'] = 100;
+        }
+    
+        // TYRES (Tyre condition)
+        if ($data['tyre_tread'] == '7.0mm (Remaining)') {
+            $category_percentages['TYRES'] = 75;
+        } else {
+            $category_percentages['TYRES'] = 50;
+        }
+    
+        // Calculate the overall percentage (simple average)
+        $total_percentage = array_sum($category_percentages);
+        $total_categories = count($category_percentages);
+        $overall_percentage = round($total_percentage / $total_categories, 2);
+
+
+        // Return the response with the percentage included
+        return [
+            'status' => 200,
+            'message' => 'Inspected report fetched successfully',
+            'data' => $data,
+            'completion_percentage' => round($completion_percentage, 2), // rounding to 2 decimal places
+            'overall_percentage' => $overall_percentage,
+            'category_percentages' => $category_percentages
+        ];
     }
+    
+
     public function getInspectedReportPoints($inspection_id)
     {
         $connection = getDbConnection();

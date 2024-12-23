@@ -174,10 +174,49 @@ switch (true) {
         echo json_encode($userController->getReferralRewards($requestUri[1]));
         break;
 
-    case $requestUri[0] === 'update-profile' && $requestMethod === 'POST' && isset($requestUri[1]):
-        $data = json_decode(file_get_contents('php://input'), true);
-        echo json_encode($userController->updateUserProfile($requestUri[1], $data['firstName'], $data['lastName'], $data['mobileNumber'], $data['profilePic']));
+    // case $requestUri[0] === 'update-profile' && $requestMethod === 'POST' && isset($requestUri[1]):
+    //     $data = json_decode(file_get_contents('php://input'), true);
+    //     echo json_encode($userController->updateUserProfile($requestUri[1], $data['firstName'], $data['lastName'], $data['mobileNumber'], $data['profilePic']));
+    //     break;
+
+    case $requestUri[0] === 'update-profiles' && $requestMethod === 'POST' && isset($requestUri[1]):
+        // Check if the form fields are set and print them for debugging
+        if (!isset($_POST['firstName'], $_POST['lastName'], $_POST['mobileNumber'])) {
+            echo json_encode(['statuscode' => 400, 'status' => 'error', 'message' => 'Missing required fields in form data.']);
+            break;
+        }
+    
+        // Collect form data from $_POST
+        $data = [
+            'firstName' => $_POST['firstName'],
+            'lastName'  => $_POST['lastName'],
+            'mobileNumber' => $_POST['mobileNumber'],
+        ];
+    
+        // Debug: Check if the data is correctly populated
+        error_log('Form Data: ' . print_r($data, true));  // This will log data to the PHP error log
+    
+        // Call the updateUserProfile method with the form data
+        echo json_encode($userController->updateUserProfile($requestUri[1], $data));
         break;
+
+    // Assuming $requestUri contains the route, and $requestMethod is POST
+    case $requestUri[0] === 'update-password' && $requestMethod === 'POST' && isset($requestUri[1]):
+        $userId = $requestUri[1]; // The user ID is captured from the URL
+
+    // Check if form data was received properly
+        if (!isset($_POST['oldPassword']) || !isset($_POST['newPassword'])) {
+            echo json_encode(['statuscode' => 400, 'status' => 'error', 'message' => 'Old and new passwords must be provided.']);
+            break;
+        }
+
+        $oldPassword = $_POST['oldPassword'];
+        $newPassword = $_POST['newPassword'];
+
+        // Call the updatePassword method in the userController
+        echo json_encode($userController->updatePassword($userId, $oldPassword, $newPassword));
+        break;
+
 
     case $requestUri[0] === 'forgot-password' && $requestMethod === 'POST':
         $data = $_POST;
@@ -194,6 +233,39 @@ switch (true) {
         echo json_encode($userController->verifyOtp($data['email'], $data['otp']));
         break;
 
+        case $requestUri[0] === 'track-product-view' && $requestMethod === 'POST' && isset($requestUri[1]):
+            $productId = (int) $requestUri[1]; 
+            $userId = isset($_POST['userId']) ? (int) $_POST['userId'] : null; 
+            $response = $productController->trackProductView($productId, $userId);
+            echo json_encode($response);
+            break;
+        
+            case $requestUri[0] === 'bookmark-product' && $requestMethod === 'POST' && isset($requestUri[1]):
+                $productId = (int) $requestUri[1]; 
+                $data = json_decode(file_get_contents('php://input'), true);  
+                $userId = isset($data['userId']) ? (int) $data['userId'] : null; 
+            
+                if (!$userId) {
+                    echo json_encode(['status' => 'error', 'message' => 'User must be logged in to bookmark a product.']);
+                    break;
+                }
+            
+                $response = $productController->bookmarkProduct($productId, $userId);
+            
+                echo json_encode($response);
+        break;
+        case $requestUri[0] === 'fetch-bookmarks' && $requestMethod === 'POST' && isset($requestUri[1]):
+            $userId = isset($data['userId']) ? (int) $data['userId'] : null;
+        
+            if (!$userId) {
+                echo json_encode(['status' => 'error', 'message' => 'User must be logged in to fetch bookmarks.']);
+                break;
+            }
+        
+            $response = $productController->getBookmarks($userId);
+            echo json_encode($response);
+            break;
+        
         // Product routes
     case $requestUri[0] === 'products' && $requestMethod === 'GET':
         echo json_encode($productController->getProducts());
@@ -211,6 +283,9 @@ switch (true) {
 
     case $requestUri[0] === 'product' && $requestMethod === 'GET' && isset($requestUri[1]):
         echo json_encode($productController->getProductById($requestUri[1]));
+        break;
+    case $requestUri[0] === 'simular-product' && $requestMethod === 'GET' && isset($requestUri[1]):
+        echo json_encode($productController->getSimilarProductsById($requestUri[1]));
         break;
 
 

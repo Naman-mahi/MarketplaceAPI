@@ -66,7 +66,7 @@ class UserController
 
             // Prepare email content
             $subject = "Welcome to Kenz Wheels, $firstName! Your OTP Code Inside";
-            
+
             $content = '
                 <h2>Welcome, ' . htmlspecialchars($firstName) . '!</h2>
                 <p>Thank you for registering with Kenz Wheels. Your OTP code is below:</p>
@@ -166,16 +166,17 @@ class UserController
     public function updateUserProfile($userId, $updateData)
     {
         $connection = getDbConnection();
-        $allowedFields = ['first_name', 'last_name', 'mobile_number', 'profile_pic'];
+        $allowedFields = ['firstName' => 'first_name', 'lastName' => 'last_name', 'mobileNumber' => 'mobile_number'];
         $updates = [];
         $types = '';
         $values = [];
 
-        foreach ($updateData as $field => $value) {
-            if (in_array($field, $allowedFields)) {
-                $updates[] = "$field = ?";
+        // Loop to check and update only non-empty fields
+        foreach ($allowedFields as $key => $dbField) {
+            if (!empty($updateData[$key])) {
+                $updates[] = "`$dbField` = ?";
                 $types .= 's';
-                $values[] = $value;
+                $values[] = $updateData[$key];
             }
         }
 
@@ -183,17 +184,109 @@ class UserController
             return ['statuscode' => 400, 'status' => 'error', 'message' => 'No valid fields to update.'];
         }
 
-        $sql = "UPDATE users SET " . implode(', ', $updates) . " WHERE user_id = ?";
+        // SQL query to update the profile
+        $sql = "UPDATE `users` SET " . implode(', ', $updates) . " WHERE `user_id` = ?";
         $stmt = $connection->prepare($sql);
         $types .= 'i';
         $values[] = $userId;
         $stmt->bind_param($types, ...$values);
 
+        // Execute the query and handle the result
         if ($stmt->execute()) {
-            return ['statuscode' => 200, 'status' => 'success', 'message' => 'Profile updated successfully.'];
+            // Fetch user's email and first name to send email
+            $sql = "SELECT `email`, `first_name` FROM `users` WHERE `user_id` = ?";
+            $stmt = $connection->prepare($sql);
+            $stmt->bind_param('i', $userId);
+            $stmt->execute();
+            $stmt->store_result();
+            $stmt->bind_result($email, $firstName);
+            $stmt->fetch();
+
+            // Prepare email content
+            $subject = "Your Profile Has Been Updated";
+            $emailContent = '
+                <p>Hello ' . htmlspecialchars($firstName) . ',</p>
+                <p>Your profile has been successfully updated.</p>
+                <p>If you did not make this change, please contact support immediately.</p>
+                <p>Thank you for using Kenz Wheels!</p>';
+
+            // Use EmailTemplate class to get formatted HTML
+            $body = EmailTemplate::getTemplate($emailContent);
+
+            // Send the email
+            if (!sendEmail($email, $subject, $body)) {
+                return ['statuscode' => 500, 'status' => 'error', 'message' => 'Profile updated, but failed to send email.'];
+            }
+
+            return ['statuscode' => 200, 'status' => 'success', 'message' => 'Profile updated successfully. An email has been sent to notify you.'];
         }
+
         return ['statuscode' => 500, 'status' => 'error', 'message' => 'Profile update failed.'];
     }
+
+
+    public function updatePassword($userId, $oldPassword, $newPassword)
+    {
+        // Validate the new password (you can extend this with more checks)
+        if (strlen($newPassword) < 8) {
+            return ['statuscode' => 400, 'status' => 'error', 'message' => 'Password must be at least 8 characters long.'];
+        }
+
+        // Check if the old password is correct
+        $connection = getDbConnection();
+        $sql = "SELECT `password_hash`, `email`, `first_name` FROM `users` WHERE `user_id` = ?";
+        $stmt = $connection->prepare($sql);
+        $stmt->bind_param('i', $userId);
+        $stmt->execute();
+        $stmt->store_result();
+
+        if ($stmt->num_rows === 0) {
+            return ['statuscode' => 404, 'status' => 'error', 'message' => 'User not found.'];
+        }
+
+        // Fetch the current password hash, email, and first name
+        $stmt->bind_result($passwordHash, $email, $firstName);
+        $stmt->fetch();
+
+        // Verify the old password
+        if (!password_verify($oldPassword, $passwordHash)) {
+            return ['statuscode' => 400, 'status' => 'error', 'message' => 'Incorrect old password.'];
+        }
+
+        // Hash the new password
+        $hashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
+
+        // Update the password in the database
+        $sql = "UPDATE `users` SET `password_hash` = ? WHERE `user_id` = ?";
+        $stmt = $connection->prepare($sql);
+        $stmt->bind_param('si', $hashedPassword, $userId);
+
+        if ($stmt->execute()) {
+            // Send email notification to the user about the password update
+            $subject = "Your Password Has Been Updated";
+            $emailContent = '
+                <p>Hello ' . htmlspecialchars($firstName) . ',</p>
+                <p>This is a notification to inform you that your password has been successfully updated.</p>
+                <p>If you did not initiate this change, please contact our support team immediately.</p>
+                <p>Thank you for using Kenz Wheels!</p>';
+
+            // Use EmailTemplate class to get formatted HTML
+            $body = EmailTemplate::getTemplate($emailContent);
+
+            // Send the email
+            if (!sendEmail($email, $subject, $body)) {
+                return ['statuscode' => 500, 'status' => 'error', 'message' => 'Failed to send notification email.'];
+            }
+
+            return ['statuscode' => 200, 'status' => 'success', 'message' => 'Password updated successfully. An email has been sent to notify you.'];
+        }
+
+        return ['statuscode' => 500, 'status' => 'error', 'message' => 'Password update failed.'];
+    }
+
+
+
+
     //forgot password
     public function forgotPassword($email)
     {
@@ -320,7 +413,7 @@ class UserController
         $email = $user['email'];
         // Prepare the email content
         $subject = "Welcome to Kenz Wheels, $firstName! Your Password Reset";
-        
+
         $content = '
             <h2>Welcome, ' . htmlspecialchars($firstName) . '!</h2>
             <p>Thank you for resetting your password. Your password has been reset successfully.</p>
@@ -382,7 +475,7 @@ class UserController
 
             // Prepare email content
             $subject = "Welcome to Kenz Wheels, $firstName! Your OTP Verified";
-            
+
             $content = '
                 <h2>Welcome, ' . htmlspecialchars($firstName) . '!</h2>
                 <p>Thank you for verifying your OTP. Your account is now active.</p>
@@ -409,7 +502,7 @@ class UserController
         $stmt->bind_param("i", $userId); // Bind the user_id parameter to the query
         $stmt->execute();
         $result = $stmt->get_result();
-    
+
         if ($result->num_rows > 0) {
             return [
                 'status' => 'success',
@@ -437,7 +530,7 @@ class UserController
         $stmt->bind_param("i", $userId);
         $stmt->execute();
         $result = $stmt->get_result();
-    
+
         if ($result->num_rows > 0) {
             return [
                 'status' => 'success',
@@ -451,7 +544,4 @@ class UserController
             'data' => []
         ];
     }
-    
-
-    
 }
