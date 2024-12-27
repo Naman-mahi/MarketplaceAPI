@@ -407,8 +407,8 @@ switch (true) {
     case $requestUri[0] === 'statistics' && $requestMethod === 'GET' && isset($requestUri[1]):
         echo json_encode($dealerController->statistics($requestUri[1]));
         break;
-    case $requestUri[0] === 'dealer-connect' && $requestMethod === 'GET':
-        echo json_encode($dealerController->Dealerconnect());
+    case $requestUri[0] === 'dealer-connect' && $requestMethod === 'GET' && isset($requestUri[1]):
+        echo json_encode($dealerController->Dealerconnect($requestUri[1]));
         break;
     case $requestUri[0] === 'dealer-wallet-amount' && $requestMethod === 'GET' && isset($requestUri[1]):
         echo json_encode($dealerController->getAmount($requestUri[1]));

@@ -721,139 +721,166 @@ class ProductController
     }
 
 
-    public function getSimilarProductsById($product_id)
-    {
-        $connection = getDbConnection();
+  public function getSimilarProductsById($product_id)
+{
+    $connection = getDbConnection();
     
-        // First, fetch the original product details (to get the category, name, description, color, price, features, brand, and more)
-        $stmt = $connection->prepare("
-            SELECT p.product_id, p.product_name, p.product_description, p.category_id, p.price, p.color, p.product_features, p.brand_id
-            FROM products p
-            LEFT JOIN product_publish pub ON p.product_id = pub.product_id
-            WHERE p.product_id = ?
-            AND pub.website = 1
-        ");
-        $stmt->bind_param("i", $product_id);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $product = $result->fetch_assoc();
-    
-        if (!$product) {
-            return ['status' => 404, 'message' => 'Product not found'];
+    // Fetch the original product details
+    $stmt = $connection->prepare("
+        SELECT p.product_id, p.product_name, p.product_description, p.category_id, p.price, p.color, p.product_features, p.brand_id
+        FROM products p
+        LEFT JOIN product_publish pub ON p.product_id = pub.product_id
+        WHERE p.product_id = ?
+        AND pub.website = 1
+    ");
+    $stmt->bind_param("i", $product_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $product = $result->fetch_assoc();
+
+    if (!$product) {
+        return ['status' => 404, 'message' => 'Product not found'];
+    }
+
+    // Extract product details
+    $category_id = $product['category_id'];
+    $product_name = $product['product_name'];
+    $product_description = $product['product_description'];
+    $price = $product['price'];
+    $color = $product['color'];
+    $product_features = $product['product_features'];
+    $brand_id = $product['brand_id'];
+
+    // Prepare SQL to fetch similar products
+    $stmt = $connection->prepare("
+        SELECT p.product_id, p.dealer_id, p.product_name, p.product_description, p.price, p.product_image, p.color, p.product_features, p.inspection_request, p.inspection_status, 
+               b.brand_name, d.city, pi.image_id, pi.image_url, pi.is_primary, pa.pf_id, pa.pf_name, pav.value, 
+               pca.custom_attribute_id, pca.attribute_name, pca.attribute_value, p.category_id, p.product_condition, p.brand_id, p.is_featured, p.top_features, p.stand_out_features
+        FROM products p
+        LEFT JOIN product_images pi ON p.product_id = pi.product_id
+        LEFT JOIN product_publish pub ON p.product_id = pub.product_id
+        LEFT JOIN product_attributes pa ON p.category_id = pa.category_id
+        LEFT JOIN product_attributes_value pav ON pa.pf_id = pav.attribute_id AND p.product_id = pav.product_id
+        LEFT JOIN product_custom_attributes pca ON p.product_id = pca.product_id
+        LEFT JOIN brands b on p.brand_id = b.brand_id
+        LEFT JOIN dealers d on p.dealer_id = d.user_id
+        WHERE p.category_id = ? 
+        AND pub.website = 1
+        AND p.product_id != ? 
+        AND (p.product_name LIKE ? OR p.product_description LIKE ? OR p.color LIKE ? OR p.price BETWEEN ? AND ? OR p.product_features LIKE ?)
+    ");
+
+    $like_name = "%" . $product_name . "%";  // Add wildcard for product name matching
+    $like_description = "%" . $product_description . "%";  // Add wildcard for product description matching
+    $like_color = "%" . $color . "%";  // Add wildcard for color matching
+    $price_min = $price * 0.8;  // 80% of the original price as the minimum
+    $price_max = $price * 1.2;  // 120% of the original price as the maximum
+    $like_features = "%" . $product_features . "%";  // Add wildcard for product features matching
+
+    $stmt->bind_param("iissssss", $category_id, $product_id, $like_name, $like_description, $like_color, $price_min, $price_max, $like_features);
+    $stmt->execute();
+    $rows = $stmt->get_result();
+
+    $similarProducts = [];
+
+    while ($row = $rows->fetch_assoc()) {
+        $similarProductId = $row['product_id'];
+
+        if (!isset($similarProducts[$similarProductId])) {
+            $similarProducts[$similarProductId] = [
+                'product_id' => $row['product_id'],
+                'dealer_id' => $row['dealer_id'],
+                'category_id' => $row['category_id'],
+                'product_name' => $row['product_name'],
+                'product_description' => $row['product_description'],
+               'price' => $row['price'],
+                'color' => $row['color'],
+                'product_condition' => $row['product_condition'],
+                'brand_id' => $row['brand_id'],
+                'brand_name' => $row['brand_name'],
+                'city' => $row['city'],
+                'product_image' => THUMBNAIL_URL . $row['product_image'],
+                'is_featured' => $row['is_featured'],
+                'product_features' => $row['product_features'],  // Convert product features to an array
+                'top_features' => $row['top_features'],
+                'stand_out_features' => $row['stand_out_features'],
+                'inspection_request' => $row['inspection_request'],
+                'inspection_status' => $row['inspection_status'],
+                'created_at' => date('Y-m-d H:i:s'),  // Assuming current timestamp
+                'updated_at' => date('Y-m-d H:i:s'),  // Assuming current timestamp
+                'images' => [],  // Initialize the images as an empty array
+                'combined_attributes' => [],
+                'custom_attributes' => [],
+                'publish_info' => [
+                    'marketplace' => 0,
+                    'website' => 1,
+                    'own_website' => 1
+                ]
+            ];
         }
-    
-        // Extract product details
-        $category_id = $product['category_id'];
-        $product_name = $product['product_name'];
-        $product_description = $product['product_description'];
-        $price = $product['price'];
-        $color = $product['color'];
-        $product_features = $product['product_features'];
-        $brand_id = $product['brand_id'];
-    
-        // Prepare SQL to fetch similar products
-        $stmt = $connection->prepare("
-            SELECT p.product_id, p.dealer_id, p.product_name, p.product_description, p.price, p.product_image, p.color, p.product_features, p.inspection_request, p.inspection_status, 
-                   b.brand_name, d.city, pi.image_id, pi.image_url, pi.is_primary, pa.pf_id, pa.pf_name, pav.value, 
-                   pca.custom_attribute_id, pca.attribute_name, pca.attribute_value, p.category_id, p.product_condition, p.brand_id, p.is_featured, p.top_features, p.stand_out_features
-            FROM products p
-            LEFT JOIN product_images pi ON p.product_id = pi.product_id
-            LEFT JOIN product_publish pub ON p.product_id = pub.product_id
-            LEFT JOIN product_attributes pa ON p.category_id = pa.category_id
-            LEFT JOIN product_attributes_value pav ON pa.pf_id = pav.attribute_id AND p.product_id = pav.product_id
-            LEFT JOIN product_custom_attributes pca ON p.product_id = pca.product_id
-            LEFT JOIN brands b on p.brand_id = b.brand_id
-            LEFT JOIN dealers d on p.dealer_id = d.user_id
-            WHERE p.category_id = ? 
-            AND pub.website = 1
-            AND p.product_id != ? 
-            AND (p.product_name LIKE ? OR p.product_description LIKE ? OR p.color LIKE ? OR p.price BETWEEN ? AND ? OR p.product_features LIKE ?)
-        ");
-    
-        $like_name = "%" . $product_name . "%";  // Add wildcard for product name matching
-        $like_description = "%" . $product_description . "%";  // Add wildcard for product description matching
-        $like_color = "%" . $color . "%";  // Add wildcard for color matching
-        $price_min = $price * 0.8;  // 80% of the original price as the minimum
-        $price_max = $price * 1.2;  // 120% of the original price as the maximum
-        $like_features = "%" . $product_features . "%";  // Add wildcard for product features matching
-    
-        $stmt->bind_param("iissssss", $category_id, $product_id, $like_name, $like_description, $like_color, $price_min, $price_max, $like_features);
-        $stmt->execute();
-        $rows = $stmt->get_result();
-    
-        $similarProducts = [];
-    
-        while ($row = $rows->fetch_assoc()) {
-            $similarProductId = $row['product_id'];
-    
-            if (!isset($similarProducts[$similarProductId])) {
-                $similarProducts[$similarProductId] = [
-                    'product_id' => $row['product_id'],
-                    'dealer_id' => $row['dealer_id'],
-                    'category_id' => $row['category_id'],
-                    'product_name' => $row['product_name'],
-                    'product_description' => $row['product_description'],
-                    'product_condition' => $row['product_condition'],
-                    'brand_id' => $row['brand_id'],
-                    'brand_name' => $row['brand_name'],
-                    'city' => $row['city'],
-                    'is_featured' => $row['is_featured'],
-                    'top_features' => $row['top_features'],
-                    'stand_out_features' => $row['stand_out_features'],
-                    'price' => $row['price'],
-                    'color' => $row['color'],
-                    'product_features' => $row['product_features'],
-                    'inspection_request' => $row['inspection_request'],
-                    'inspection_status' => $row['inspection_status'],
-                    'product_image' => THUMBNAIL_URL . $row['product_image'],
-                    'images' => [],
-                    'combined_attributes' => [],
-                    'custom_attributes' => [],
-                ];
-            }
-    
-            // Handle images - Avoid duplicates using associative arrays
-            if ($row['image_id'] && !isset($similarProducts[$similarProductId]['images'][$row['image_id']])) {
+
+        // Handle images - Avoid duplicates using associative arrays (image_id as key)
+        if ($row['image_id']) {
+            if (!isset($similarProducts[$similarProductId]['images'][$row['image_id']])) {
                 $similarProducts[$similarProductId]['images'][$row['image_id']] = [
                     'image_id' => $row['image_id'],
                     'image_url' => IMAGES_URL . $row['image_url'],
                     'is_primary' => $row['is_primary'],
                 ];
             }
-    
-            // Handle combined attributes - Avoid duplicates using associative arrays
-            if ($row['pf_id'] && !isset($similarProducts[$similarProductId]['combined_attributes'][$row['pf_id']])) {
-                $similarProducts[$similarProductId]['combined_attributes'][$row['pf_id']] = [
-                    'pf_id' => $row['pf_id'],
-                    'pf_name' => $row['pf_name'],
-                    'value' => $row['value'],
-                ];
-            }
-    
-            // Handle custom attributes - Avoid duplicates using associative arrays
-            if ($row['custom_attribute_id'] && !isset($similarProducts[$similarProductId]['custom_attributes'][$row['custom_attribute_id']])) {
-                $similarProducts[$similarProductId]['custom_attributes'][$row['custom_attribute_id']] = [
-                    'custom_attribute_id' => $row['custom_attribute_id'],
-                    'attribute_name' => $row['attribute_name'],
-                    'attribute_value' => $row['attribute_value'],
-                ];
-            }
         }
-    
-        // Return the response
-        if (!empty($similarProducts)) {
-            return [
-                'status' => 200,
-                'data' => array_values($similarProducts), // Return the products as an indexed array
-            ];
-        } else {
-            return [
-                'status' => 404,
-                'message' => 'No similar products found',
-            ];
-        }
+
+      // Handle combined attributes - Avoid duplicates using associative arrays
+if ($row['pf_id']) {
+    if (!isset($similarProducts[$similarProductId]['combined_attributes'][$row['pf_id']])) {
+        $similarProducts[$similarProductId]['combined_attributes'][$row['pf_id']] = [
+            'pf_id' => $row['pf_id'],
+            'category_id' => $row['category_id'],
+            'pf_name' => $row['pf_name'],
+            'value' => $row['value'],
+        ];
     }
+}
+
+// Handle custom attributes - Avoid duplicates using associative arrays
+if ($row['custom_attribute_id']) {
+    if (!isset($similarProducts[$similarProductId]['custom_attributes'][$row['custom_attribute_id']])) {
+        $similarProducts[$similarProductId]['custom_attributes'][$row['custom_attribute_id']] = [
+            'custom_attribute_id' => $row['custom_attribute_id'],
+            'attribute_name' => $row['attribute_name'],
+            'attribute_value' => $row['attribute_value'],
+        ];
+    }
+}
+    }
+
+    // Remove duplicate images from the 'images' array and return the response
+    foreach ($similarProducts as $key => $product) {
+        // Re-index images to ensure clean output without keys
+        $similarProducts[$key]['images'] = array_values($product['images']);
+     $similarProducts[$key]['combined_attributes'] = array_values($product['combined_attributes']);
     
+    // Re-index custom attributes to ensure clean output without keys
+    $similarProducts[$key]['custom_attributes'] = array_values($product['custom_attributes']);
+}
+    // Return the response
+    if (!empty($similarProducts)) {
+        return [
+            'status' => 200,
+            'message' => 'Similar products found',
+            'data' => array_values($similarProducts), // Return the products as an indexed array
+        ];
+    } else {
+        return [
+            'status' => 404,
+            'message' => 'No similar products found',
+        ];
+    }
+}
+
+
+
+
     public function trackProductView($productId, $userId = null)
     {
 
@@ -947,130 +974,138 @@ class ProductController
             return ['status' => 'error', 'message' => 'Failed to bookmark the product.'];
         }
     }
-    
-    public function getBookmarks($userId)
-    {
-        // Ensure the user is logged in
-        if (!$userId) {
-            return ['status' => 'error', 'message' => 'User must be logged in to fetch bookmarks.'];
-        }
-    
-        // Get the database connection
-        $connection = getDbConnection();
-    
-        // Query to fetch the list of product IDs the user has bookmarked
-        $sql = "SELECT product_id FROM product_bookmarks WHERE user_id = ?";
-        $stmt = $connection->prepare($sql);
-        $stmt->bind_param('i', $userId);
-        $stmt->execute();
-        $stmt->store_result();
-        $stmt->bind_result($productId);
-    
-        // Initialize an array to store the product IDs
-        $bookmarkedProducts = [];
-        while ($stmt->fetch()) {
-            $bookmarkedProducts[] = $productId;
-        }
-    
-        // If no bookmarks are found, return the response
-        if (count($bookmarkedProducts) == 0) {
-            return ['status' => 'error', 'message' => 'No bookmarks found for this user.'];
-        }
-    
-        // Prepare SQL to fetch details of the bookmarked products
-        $productIds = implode(',', $bookmarkedProducts); // Convert the array of product IDs to a string for the query
-    
-        $sql = "
-            SELECT p.product_id, p.dealer_id, p.category_id, p.product_name, p.product_description, p.price, p.color, p.product_condition, p.brand_id,
-                   b.brand_name, d.city, p.product_image, p.is_featured, p.product_features, p.top_features, p.stand_out_features, p.inspection_request,
-                   p.inspection_status, p.created_at, p.updated_at, pi.image_id, pi.image_url, pi.is_primary, pa.pf_id, pa.pf_name, pav.value,
-                   pca.custom_attribute_id, pca.attribute_name, pca.attribute_value
-            FROM products p
-            LEFT JOIN product_images pi ON p.product_id = pi.product_id
-            LEFT JOIN product_publish pub ON p.product_id = pub.product_id
-            LEFT JOIN product_attributes pa ON p.category_id = pa.category_id
-            LEFT JOIN product_attributes_value pav ON pa.pf_id = pav.attribute_id AND p.product_id = pav.product_id
-            LEFT JOIN product_custom_attributes pca ON p.product_id = pca.product_id
-            LEFT JOIN brands b ON p.brand_id = b.brand_id
-            LEFT JOIN dealers d ON p.dealer_id = d.user_id
-            WHERE p.product_id IN ($productIds)
-            AND pub.website = 1
-        ";
-    
-        $result = $connection->query($sql);
-    
-        $products = [];
-        while ($row = $result->fetch_assoc()) {
-            $productId = $row['product_id'];
-    
-            if (!isset($products[$productId])) {
-                $products[$productId] = [
-                    'product_id' => $row['product_id'],
-                    'dealer_id' => $row['dealer_id'],
-                    'category_id' => $row['category_id'],
-                    'product_name' => $row['product_name'],
-                    'product_description' => $row['product_description'],
-                    'price' => number_format($row['price'], 2),  // Ensure price is formatted
-                    'color' => $row['color'],
-                    'product_condition' => $row['product_condition'],
-                    'brand_id' => $row['brand_id'],
-                    'brand_name' => $row['brand_name'],
-                    'city' => $row['city'],
-                    'product_image' => IMAGES_URL . $row['product_image'],
-                    'is_featured' => $row['is_featured'],
-                    'product_features' => $row['product_features'],  // Convert product features to an array
-                    'top_features' => $row['top_features'],
-                    'stand_out_features' => $row['stand_out_features'],
-                    'inspection_request' => $row['inspection_request'],
-                    'inspection_status' => $row['inspection_status'],
-                    'created_at' => $row['created_at'],
-                    'updated_at' => $row['updated_at'],
-                    'images' => [],
-                    'combined_attributes' => [],
-                    'custom_attributes' => [],
-                    'publish_info' => [
-                        'marketplace' => 0,
-                        'website' => 1,
-                        'own_website' => 1
-                    ]
-                ];
-            }
-    
-            // Handle images - Avoid duplicates using associative arrays
-            if ($row['image_id'] && !isset($products[$productId]['images'][$row['image_id']])) {
-                $products[$productId]['images'][$row['image_id']] = [
-                    'image_id' => $row['image_id'],
-                    'image_url' => IMAGES_URL . $row['image_url'],
-                    'is_primary' => $row['is_primary'],
-                ];
-            }
-    
-            // Handle combined attributes - Avoid duplicates using associative arrays
-            if ($row['pf_id'] && !isset($products[$productId]['combined_attributes'][$row['pf_id']])) {
-                $products[$productId]['combined_attributes'][$row['pf_id']] = [
-                    'pf_id' => $row['pf_id'],
-                    'category_id' => $row['category_id'],
-                    'pf_name' => $row['pf_name'],
-                    'value' => $row['value'],
-                ];
-            }
-    
-            // Handle custom attributes - Avoid duplicates using associative arrays
-            if ($row['custom_attribute_id'] && !isset($products[$productId]['custom_attributes'][$row['custom_attribute_id']])) {
-                $products[$productId]['custom_attributes'][$row['custom_attribute_id']] = [
-                    'custom_attribute_id' => $row['custom_attribute_id'],
-                    'attribute_name' => $row['attribute_name'],
-                    'attribute_value' => $row['attribute_value'],
-                ];
-            }
-        }
-    
-        // Return the result
-        return [
-            'status' => 200,
-            'message' => 'Bookmarks fetched successfully.',
-            'data' => array_values($products)  // Return the products as an indexed array
-        ];
+   
+
+public function getBookmarks($userId)
+{
+    // Ensure the user is logged in
+    if (!$userId) {
+        return ['status' => 'error', 'message' => 'User must be logged in to fetch bookmarks.'];
     }
+
+    // Get the database connection
+    $connection = getDbConnection();
+
+    // Query to fetch the list of product IDs the user has bookmarked
+    $sql = "SELECT product_id FROM product_bookmarks WHERE user_id = ?";
+    $stmt = $connection->prepare($sql);
+    $stmt->bind_param('i', $userId);
+    $stmt->execute();
+    $stmt->store_result();
+    $stmt->bind_result($productId);
+
+    // Initialize an array to store the product IDs
+    $bookmarkedProducts = [];
+    while ($stmt->fetch()) {
+        $bookmarkedProducts[] = $productId;
+    }
+
+    // If no bookmarks are found, return the response
+    if (count($bookmarkedProducts) == 0) {
+        return ['status' => 'error', 'message' => 'No bookmarks found for this user.'];
+    }
+
+    // Prepare SQL to fetch details of the bookmarked products
+    $productIds = implode(',', $bookmarkedProducts); // Convert the array of product IDs to a string for the query
+
+    $sql = "
+        SELECT p.product_id, p.dealer_id, p.category_id, p.product_name, p.product_description, p.price, p.color, p.product_condition, p.brand_id,
+               b.brand_name, d.city, p.product_image, p.is_featured, p.product_features, p.top_features, p.stand_out_features, p.inspection_request,
+               p.inspection_status, p.created_at, p.updated_at, pi.image_id, pi.image_url, pi.is_primary, pa.pf_id, pa.pf_name, pav.value,
+               pca.custom_attribute_id, pca.attribute_name, pca.attribute_value, pub.marketplace, pub.website, pub.own_website
+        FROM products p
+        LEFT JOIN product_images pi ON p.product_id = pi.product_id
+        LEFT JOIN product_publish pub ON p.product_id = pub.product_id
+        LEFT JOIN product_attributes pa ON p.category_id = pa.category_id
+        LEFT JOIN product_attributes_value pav ON pa.pf_id = pav.attribute_id AND p.product_id = pav.product_id
+        LEFT JOIN product_custom_attributes pca ON p.product_id = pca.product_id
+        LEFT JOIN brands b ON p.brand_id = b.brand_id
+        LEFT JOIN dealers d ON p.dealer_id = d.user_id
+        WHERE p.product_id IN ($productIds)
+        AND pub.website = 1
+    ";
+
+    $result = $connection->query($sql);
+
+    $products = [];
+    while ($row = $result->fetch_assoc()) {
+        $productId = $row['product_id'];
+
+        if (!isset($products[$productId])) {
+            $products[$productId] = [
+                'product_id' => $row['product_id'],
+                'dealer_id' => $row['dealer_id'],
+                'category_id' => $row['category_id'],
+                'product_name' => $row['product_name'],
+                'product_description' => $row['product_description'],
+                'price' => $row['price'],
+                'color' => $row['color'],
+                'product_condition' => $row['product_condition'],
+                'brand_id' => $row['brand_id'],
+                'brand_name' => $row['brand_name'],
+                'city' => $row['city'],
+                'product_image' => IMAGES_URL . $row['product_image'],
+                'is_featured' => $row['is_featured'],
+                'product_features' => $row['product_features'],  // Assuming the features are stored as a JSON string
+                'top_features' => $row['top_features'],
+                'stand_out_features' => $row['stand_out_features'],
+                'inspection_request' => $row['inspection_request'],
+                'inspection_status' => $row['inspection_status'],
+                'created_at' => $row['created_at'],
+                'updated_at' => $row['updated_at'],
+                'images' => [],
+                'combined_attributes' => [],
+                'custom_attributes' => [],
+                'publish_info' => [
+                    'marketplace' => $row['marketplace'],
+                    'website' => $row['website'],
+                    'own_website' => $row['own_website'],
+                ],
+            ];
+        }
+
+        // Handle images - Avoid duplicates using associative arrays
+        if ($row['image_id'] && !isset($products[$productId]['images'][$row['image_id']])) {
+            $products[$productId]['images'][$row['image_id']] = [
+                'image_id' => $row['image_id'],
+                'image_url' => IMAGES_URL . $row['image_url'],
+                'is_primary' => $row['is_primary'],
+            ];
+        }
+
+        // Handle combined attributes - Avoid duplicates using associative arrays
+        if ($row['pf_id'] && !isset($products[$productId]['combined_attributes'][$row['pf_id']])) {
+            $products[$productId]['combined_attributes'][$row['pf_id']] = [
+                'pf_id' => $row['pf_id'],
+                'category_id' => $row['category_id'],
+                'pf_name' => $row['pf_name'],
+                'value' => $row['value'],
+            ];
+        }
+
+        // Handle custom attributes - Avoid duplicates using associative arrays
+        if ($row['custom_attribute_id'] && !isset($products[$productId]['custom_attributes'][$row['custom_attribute_id']])) {
+            $products[$productId]['custom_attributes'][$row['custom_attribute_id']] = [
+                'custom_attribute_id' => $row['custom_attribute_id'],
+                'attribute_name' => $row['attribute_name'],
+                'attribute_value' => $row['attribute_value'],
+            ];
+        }
+    }
+
+    // Clean up the "images", "combined_attributes", and "custom_attributes" arrays to ensure they're indexed (no numeric keys)
+    foreach ($products as &$product) {
+        $product['images'] = array_values($product['images']);
+        $product['combined_attributes'] = array_values($product['combined_attributes']);
+        $product['custom_attributes'] = array_values($product['custom_attributes']);
+    }
+
+    // Return the result
+    return [
+        'status' => 200,
+        'message' => 'Bookmarks fetched successfully.',
+        'data' => array_values($products)  // Return the products as an indexed array
+    ];
+}
 
 }

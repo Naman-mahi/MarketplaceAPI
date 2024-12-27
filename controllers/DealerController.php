@@ -579,35 +579,40 @@ class DealerController
     }
 
     //dealer products
-    public function Dealerconnect()
-    {
-        // Step 1: Get the database connection
-        $connection = getDbConnection();
-        
-        // Step 2: Define the marketplace variable
-        $marketplace = 1;
-        
-        // Step 3: Prepare the SQL query
-        $stmt = $connection->prepare("SELECT *
-                                      FROM products 
-                                      JOIN product_publish ON products.product_id = product_publish.product_id 
-                                      LEFT JOIN brands ON products.brand_id = brands.brand_id
-                                      WHERE product_publish.marketplace = ?");
-        
-        // Step 4: Bind the parameter and execute the statement
-        $stmt->bind_param("i", $marketplace);
-        $stmt->execute();
-        
-        // Step 5: Get the result
-        $result = $stmt->get_result();
-        
-        // Step 6: Check if products are found
-        if ($result->num_rows > 0) {
-            $products = [];
-            
-            // Step 7: Fetch each row and format the response as needed
-            while ($row = $result->fetch_assoc()) {
-                $products[] = [
+      
+public function Dealerconnect($dealer_id)
+{
+    // Step 1: Get the database connection
+    $connection = getDbConnection();
+    $dealer_id = $dealer_id;
+    $marketplace = 1;
+
+    $stmt = $connection->prepare("
+    SELECT p.product_id, p.dealer_id, p.category_id, p.product_name,b.brand_name, p.product_image, p.product_condition, p.is_featured, p.product_features, p.brand_id, p.product_description, p.price, p.color, p.top_features, p.stand_out_features, p.created_at, p.updated_at,
+           pi.image_id, pi.image_url, pi.is_primary,
+           pa.pf_id, pa.category_id AS attribute_category_id, pa.pf_name,
+           pav.value,
+           pca.custom_attribute_id, pca.attribute_name, pca.attribute_value,
+           pub.marketplace, pub.website, pub.own_website
+    FROM products p
+    LEFT JOIN product_images pi ON p.product_id = pi.product_id
+    LEFT JOIN product_attributes pa ON p.category_id = pa.category_id
+    LEFT JOIN product_attributes_value pav ON pa.pf_id = pav.attribute_id AND p.product_id = pav.product_id
+    LEFT JOIN product_custom_attributes pca ON p.product_id = pca.product_id
+    LEFT JOIN product_publish pub ON p.product_id = pub.product_id
+    LEFT JOIN brands b ON p.brand_id = b.brand_id
+    WHERE p.dealer_id != ? AND pub.marketplace = ?");
+    $stmt->bind_param("ii", $dealer_id, $marketplace);
+    $stmt->execute();
+
+    $rows = $stmt->get_result();
+    error_log(print_r($rows, true)); // Log the rows for inspection
+    if ($rows) {
+        $products = [];
+        foreach ($rows as $row) {
+            $productId = $row['product_id'];
+            if (!isset($products[$productId])) {
+                $products[$productId] = [
                     'product_id' => $row['product_id'],
                     'dealer_id' => $row['dealer_id'],
                     'category_id' => $row['category_id'],
@@ -625,25 +630,55 @@ class DealerController
                     'stand_out_features' => $row['stand_out_features'],
                     'created_at' => $row['created_at'] ?? null,
                     'updated_at' => $row['updated_at'] ?? null,
-                    'brand_name' => $row['brand_name']
+                    'images' => [],
+                    'combined_attributes' => [],
+                    'custom_attributes' => [],
+                    'publish_info' => null,
                 ];
             }
-            
-            // Step 8: Return the formatted data
-            return [
-                'status' => 'success',
-                'message' => 'Products found successfully',
-                'data' => $products
-            ];
+
+            // Add image if not already added
+            if ($row['image_id'] && !in_array($row['image_id'], array_column($products[$productId]['images'], 'image_id'))) {
+                $products[$productId]['images'][] = [
+                    'image_id' => $row['image_id'],
+                    'image_url' => IMAGES_URL . $row['image_url'],
+                    'is_primary' => $row['is_primary'],
+                ];
+            }
+
+            // Add combined attribute if not already added
+            if ($row['pf_id'] && !in_array($row['pf_id'], array_column($products[$productId]['combined_attributes'], 'pf_id'))) {
+                $products[$productId]['combined_attributes'][] = [
+                    'pf_id' => $row['pf_id'],
+                    'category_id' => $row['attribute_category_id'],
+                    'pf_name' => $row['pf_name'],
+                    'value' => $row['value'],
+                ];
+            }
+
+            // Add custom attribute if not already added
+            if ($row['custom_attribute_id'] && !in_array($row['custom_attribute_id'], array_column($products[$productId]['custom_attributes'], 'custom_attribute_id'))) {
+                $products[$productId]['custom_attributes'][] = [
+                    'custom_attribute_id' => $row['custom_attribute_id'],
+                    'attribute_name' => $row['attribute_name'],
+                    'attribute_value' => $row['attribute_value'],
+                ];
+            }
+
+            // Add publish info if not already added
+            if (!$products[$productId]['publish_info']) {
+                $products[$productId]['publish_info'] = [
+                    'marketplace' => $row['marketplace'],
+                    'website' => $row['website'],
+                    'own_website' => $row['own_website'],
+                ];
+            }
         }
-        
-        // Step 9: Return an error message if no products found
-        return [
-            'status' => 'error',
-            'message' => 'No products found',
-            'data' => []
-        ];
+        return ['status' => 200, 'message' => 'Products fetched successfully', 'data' => array_values($products)];
+    } else {
+        return ['status' => 404, 'message' => 'No products found'];
     }
+}
     
 
     public function getAmount($userId)
