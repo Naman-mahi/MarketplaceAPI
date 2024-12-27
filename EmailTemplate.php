@@ -90,7 +90,7 @@ class EmailTemplate {
         <body>
             <div class="email-wrapper">
                 <div class="header">
-                    <img src="https://kenzwheels.com/marketplace/Manage/assets/images/kenzwheels-light.png" alt="Kenz Wheels" class="logo">
+                    <img src="https://kenzwheels.com/marketplace/manage/assets/images/kenzwheels-light.png" alt="Kenz Wheels" class="logo">
                 </div>
                 
                 <div class="content">

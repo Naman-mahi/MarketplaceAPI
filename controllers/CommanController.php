@@ -9,23 +9,30 @@ class CommanController
     public function getBrands()
     {
         $connection = getDbConnection();
+        // Execute the SQL query to fetch the necessary brand details
         $stmt = $connection->prepare("SELECT brand_id, brand_name, brand_logo, category_id, created_date FROM brands WHERE 1");
         $stmt->execute();
         $result = $stmt->get_result();
-        $brands = [];
         
+        $brands = [];
+    
+        // Loop through each row of the results
         while ($row = $result->fetch_assoc()) {
-            // Add full URL to brand logo
+            // Check if the brand logo is not empty, then append the full URL
             $row['brand_logo'] = !empty($row['brand_logo']) ? BRAND_URL . $row['brand_logo'] : null;
+            
+            // Add the row to the brands array
             $brands[] = $row;
         }
-
+    
+        // Return the response with status and data
         return [
             'status' => 200,
             'message' => 'Brands fetched successfully',
             'data' => $brands
         ];
     }
+    
 
     // list of cities from dealers table
     public function getCities()
@@ -115,7 +122,7 @@ class CommanController
                             'price' => $row['price'],
                             'color' => $row['color'],
                             'brand_id' => $row['brand_id'],
-                            'product_image' => 'https://kenzwheels.com/marketplace/Manage/uploads/ProductThumbnail/'.$row['product_image'],
+                            'product_image' => 'https://kenzwheels.com/marketplace/manage/uploads/ProductThumbnail/'.$row['product_image'],
                             'top_features' => $row['top_features'],
                             'is_featured' => $row['is_featured'],
                             'product_features' => $row['product_features'],
@@ -133,7 +140,7 @@ class CommanController
                     if ($row['image_id'] && !in_array($row['image_id'], array_column($products[$productId]['images'], 'image_id'))) {
                         $products[$productId]['images'][] = [
                             'image_id' => $row['image_id'],
-                            'image_url' => 'https://kenzwheels.com/marketplace/Manage/uploads/ProductImages/'.$row['image_url'],
+                            'image_url' => 'https://kenzwheels.com/marketplace/manage/uploads/ProductImages/'.$row['image_url'],
                             'is_primary' => $row['is_primary'],
                         ];
                     }
@@ -355,6 +362,25 @@ class CommanController
         $stmt->bind_param('i', $inspection_id);
         $stmt->execute();
         $result = $stmt->get_result();
-        return ['status' => 200, 'message' => 'Inspected report points fetched successfully', 'data' => $result->fetch_all(MYSQLI_ASSOC)];
+        $data = [];
+    
+        while ($row = $result->fetch_assoc()) {
+            $row['image_url'] = INSPECTION_URL . $row['image_url'];
+            $data[] = $row;
+        }
+    
+        if (count($data) > 0) {
+            return [
+                'status' => 200,
+                'message' => 'Inspected report points fetched successfully',
+                'data' => $data
+            ];
+        } else {
+            return [
+                'status' => 404,
+                'message' => 'No inspected report points found'
+            ];
+        }
     }
+    
 }
