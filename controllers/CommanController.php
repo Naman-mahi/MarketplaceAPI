@@ -383,4 +383,39 @@ class CommanController
         }
     }
     
-}
+
+        public function deleteuserData($user_id)
+        {
+            $connection = getDbConnection();
+            
+            // First copy the user data to deleted_users table
+            $stmt = $connection->prepare("INSERT INTO deleted_users 
+                (user_id, email, password_hash, first_name, last_name, mobile_number, 
+                profile_pic, user_status, otp, created_at, referral_code, referred_by, 
+                role_id, reset_token, reset_token_expiration)
+                SELECT user_id, email, password_hash, first_name, last_name, mobile_number,
+                profile_pic, user_status, otp, created_at, referral_code, referred_by,
+                role_id, reset_token, reset_token_expiration 
+                FROM users WHERE user_id = ?");
+            
+            $stmt->bind_param('i', $user_id);
+            $stmt->execute();
+            
+            // Then delete from users table
+            $stmt = $connection->prepare("DELETE FROM users WHERE user_id = ?");
+            $stmt->bind_param('i', $user_id);
+            $stmt->execute();
+            
+            if($stmt->affected_rows > 0) {
+                return [
+                    'status' => 200,
+                    'message' => 'User data backed up and deleted successfully'
+                ];
+            } else {
+                return [
+                    'status' => 404, 
+                    'message' => 'User not found'
+                ];
+            }
+        }
+    }

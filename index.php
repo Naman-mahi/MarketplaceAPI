@@ -166,6 +166,10 @@ switch (true) {
         echo json_encode($userController->getUserProfile($requestUri[1]));
         break;
 
+    case $requestUri[0] === 'delete-user' && $requestMethod === 'DELETE' && isset($requestUri[1]):
+        echo json_encode($commanController->deleteuserData($requestUri[1]));
+        break;
+
     case $requestUri[0] === 'referral-code' && $requestMethod === 'GET' && isset($requestUri[1]):
         echo json_encode($userController->getReferralCode($requestUri[1]));
         break;
